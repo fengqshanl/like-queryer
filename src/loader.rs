@@ -1,10 +1,10 @@
+
 use crate::DataSet;
 use anyhow::Result;
 use polars::prelude::*;
 use std::io::Cursor;
-use crate::loader::Loader::Csv;
 
-pub trait load {
+pub trait Load {
     type Error;
     fn load(self) -> Result<DataSet, Self::Error>;
 }
@@ -27,10 +27,11 @@ impl Loader {
 }
 
 pub fn detect_content(data: String) -> Loader {
+    // TODO: 内容检测
     Loader::Csv(CsvLoader(data))
 }
 
-impl Load for CsvLoader{
+impl Load for CsvLoader {
     type Error = anyhow::Error;
 
     fn load(self) -> Result<DataSet, Self::Error> {

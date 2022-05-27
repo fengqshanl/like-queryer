@@ -1,3 +1,4 @@
+
 use anyhow::{anyhow, Result};
 use polars::prelude::*;
 use sqlparser::parser::Parser;
@@ -9,7 +10,6 @@ mod convert;
 mod dialect;
 mod loader;
 mod fetcher;
-
 use convert::Sql;
 use loader::detect_content;
 use fetcher::retrieve_data;
@@ -17,8 +17,10 @@ use fetcher::retrieve_data;
 pub use dialect::example_sql;
 pub use dialect::TyrDialect;
 
+#[derive(Debug)]
 pub struct DataSet(DataFrame);
 
+/// 让 DataSet 用起来和 DataFrame 一致
 impl Deref for DataSet {
     type Target = DataFrame;
 
@@ -27,13 +29,15 @@ impl Deref for DataSet {
     }
 }
 
+/// 让 DataSet 用起来和 DataFrame 一致
 impl DerefMut for DataSet {
-    fn deref_mut(&mut self) -> &mut Self::Target{
+    fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
 impl DataSet {
+    /// 从 DataSet 转换成 csv
     pub fn to_csv(&self) -> Result<String> {
         let mut buf = Vec::new();
         let writer = CsvWriter::new(&mut buf);
@@ -42,6 +46,7 @@ impl DataSet {
     }
 }
 
+/// 从 from 中获取数据，从 where 中过滤，最后选取需要返回的列
 pub async fn query<T: AsRef<str>>(sql: T) -> Result<DataSet> {
     let ast = Parser::parse_sql(&TyrDialect::default(), sql.as_ref())?;
 
@@ -51,7 +56,10 @@ pub async fn query<T: AsRef<str>>(sql: T) -> Result<DataSet> {
 
     let sql = &ast[0];
 
-    let Sql{
+    // 整个 SQL AST 转换成我们定义的 Sql 结构的细节都埋藏在 try_into() 中
+    // 我们只需关注数据结构的使用，怎么转换可以之后需要的时候才关注，这是
+    // 关注点分离，是我们控制软件复杂度的法宝。
+    let Sql {
         source,
         condition,
         selection,
@@ -62,6 +70,8 @@ pub async fn query<T: AsRef<str>>(sql: T) -> Result<DataSet> {
 
     info!("retrieving data from source: {}", source);
 
+    // 从 source 读入一个 DataSet
+    // detect_content，怎么 detect 不重要，重要的是它能根据内容返回 DataSet
     let ds = detect_content(retrieve_data(source).await?).load()?;
 
     let mut filtered = match condition {
@@ -79,4 +89,3 @@ pub async fn query<T: AsRef<str>>(sql: T) -> Result<DataSet> {
 
     Ok(DataSet(filtered.select(selection).collect()?))
 }
-
